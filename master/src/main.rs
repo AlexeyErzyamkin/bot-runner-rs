@@ -1,10 +1,11 @@
 use std::path::Path;
 use std::io;
 use std::sync::{
-    mpsc,
-    mpsc::{Sender, Receiver}
+    RwLock,
+    Arc
 };
 use std::thread;
+use std::default::Default;
 
 use actix_web::{
     HttpServer,
@@ -23,41 +24,68 @@ struct MasterConfig {
     data_path: String
 }
 
-enum UserCommand {
-    Update,
-    Start,
-    Stop
-}
-
-fn index() -> impl Responder {
-    format!("Hello")
-}
-
-fn index2(arg: web::Path<u32>) -> impl Responder {
-    format!("Hello {}", arg)
-}
-
-// fn download() -> impl Responder {
-    
+// enum UserCommand {
+//     Update,
+//     Start,
+//     Stop
 // }
+
+#[derive(PartialEq)]
+enum Action {
+    Stop,
+    Start,
+    Update
+}
+
+struct State {
+    version: u32,
+    action: Action
+}
+
+impl State {
+    pub fn update(&mut self, action: Action) {
+        if self.action != action {
+            self.version += 1;
+            self.action = action;
+        }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            action: Action::Stop
+        }
+    }
+}
+
+fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
+    let state_read = state.read().unwrap();
+
+    format!("state: v={}, a={}", state_read.version, match state_read.action {
+        Action::Update => "update",
+        Action::Start => "start",
+        Action::Stop => "stop"
+    })
+}
 
 fn main() -> std::io::Result<()> {
     let config_path = Path::new("./data/master_config.json");
     let config: MasterConfig = shared::read_config(config_path)?;
 
-    let (itx, irx) = mpsc::channel();
+    let data = web::Data::new(RwLock::new(State::default()));
 
-    input(itx);
+    handle_input(data.clone());
 
-    let handlers = || {
+    let handlers = move || {
         App::new()
+            .register_data(data.clone())
             .service(
-                web::resource("/check_update").to(index)
-            )
-            .service(
-                web::resource("/{id}").route(
-                    web::get().to(index2)
-                )
+                web::scope("/bot-runner")
+                    .service(
+                        web::resource("/state").to(get_state)
+                    )
             )
     };
 
@@ -66,11 +94,7 @@ fn main() -> std::io::Result<()> {
         .run()
 }
 
-fn q(rx: mpsc::Receiver<UserCommand>) {
-
-}
-
-fn input(tx: mpsc::Sender<UserCommand>) /*-> io::Result<()>*/ {
+fn handle_input(state: web::Data<RwLock<State>>) {
     thread::spawn(move || {
         let mut buf = String::new();
 
@@ -78,18 +102,19 @@ fn input(tx: mpsc::Sender<UserCommand>) /*-> io::Result<()>*/ {
             let len = io::stdin().read_line(&mut buf).expect("Read input failed");
 
             if len > 0 {
-                let command = match &buf[..0] {
-                    "u" => UserCommand::Update,
-                    "r" => UserCommand::Start,
-                    "s" => UserCommand::Stop,
+                let cmd = &buf[..1];
+                let action = match cmd {
+                    "u" => Action::Update,
+                    "r" => Action::Start,
+                    "s" => Action::Stop,
                     _ => {
-                        eprintln!("Invalid command");
+                        eprintln!("Invalid command: {}", cmd);
 
                         continue;
                     }
                 };
 
-                tx.send(command).expect("Use command sending failed");
+                (*state.write().unwrap()).update(action);
             }
         }
 

@@ -5,7 +5,6 @@ use std::sync::{
     Arc
 };
 use std::thread;
-use std::default::Default;
 
 use actix_web::{
     HttpServer,
@@ -18,46 +17,14 @@ use serde::Deserialize;
 
 use shared;
 
+mod state;
+
+use state::{State, Action};
+
 #[derive(Deserialize)]
 struct MasterConfig {
     addr: String,
     data_path: String
-}
-
-// enum UserCommand {
-//     Update,
-//     Start,
-//     Stop
-// }
-
-#[derive(PartialEq)]
-enum Action {
-    Stop,
-    Start,
-    Update
-}
-
-struct State {
-    version: u32,
-    action: Action
-}
-
-impl State {
-    pub fn update(&mut self, action: Action) {
-        if self.action != action {
-            self.version += 1;
-            self.action = action;
-        }
-    }
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            version: 0,
-            action: Action::Stop
-        }
-    }
 }
 
 fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
@@ -89,6 +56,8 @@ fn main() -> std::io::Result<()> {
             )
     };
 
+    println!("Master started");
+
     HttpServer::new(handlers)
         .bind(config.addr)?
         .run()
@@ -96,9 +65,8 @@ fn main() -> std::io::Result<()> {
 
 fn handle_input(state: web::Data<RwLock<State>>) {
     thread::spawn(move || {
-        let mut buf = String::new();
-
         loop {
+            let mut buf = String::new();
             let len = io::stdin().read_line(&mut buf).expect("Read input failed");
 
             if len > 0 {

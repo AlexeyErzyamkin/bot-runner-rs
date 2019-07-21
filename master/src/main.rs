@@ -13,9 +13,15 @@ use actix_web::{
     web
 };
 
+use actix_files::NamedFile;
+
 use serde::Deserialize;
 
 use shared;
+use shared::models::{
+    WorkerInfo,
+    WorkerAction
+};
 
 mod state;
 
@@ -30,11 +36,22 @@ struct MasterConfig {
 fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
     let state_read = state.read().unwrap();
 
-    format!("state: v={}, a={}", state_read.version, match state_read.action {
-        Action::Update => "update",
-        Action::Start => "start",
-        Action::Stop => "stop"
-    })
+    let worker_info = WorkerInfo {
+        version: state_read.version,
+        action: match state_read.action {
+            Action::Update => WorkerAction::Update,
+            Action::Start => WorkerAction::Start,
+            Action::Stop => WorkerAction::Stop
+        },
+        update_url: "".to_string(),
+        start_command_line: "".to_string()
+    };
+
+    web::Json(worker_info)
+}
+
+fn get_update() -> impl Responder {
+    NamedFile::open("tasks.txt")
 }
 
 fn main() -> std::io::Result<()> {
@@ -52,6 +69,9 @@ fn main() -> std::io::Result<()> {
                 web::scope("/bot-runner")
                     .service(
                         web::resource("/state").to(get_state)
+                    )
+                    .service(
+                        web::resource("/update").to(get_update)
                     )
             )
     };

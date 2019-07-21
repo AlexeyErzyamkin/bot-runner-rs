@@ -9,11 +9,29 @@ pub enum Action {
 
 pub struct State {
     pub version: u32,
-    pub action: Action
+    pub update_version: u32,
+    pub action: Action,
+    pub update_file: Option<String>
 }
 
 impl State {
-    pub fn update(&mut self, action: Action) {
+    pub fn start(&mut self) {
+        self.set_action(Action::Start);
+    }
+
+    pub fn stop(&mut self) {
+        self.set_action(Action::Stop);
+    }
+
+    pub fn update(&mut self, update_file: String) {
+        self.version += 1;
+        self.update_version += 1;
+        self.update_file = Some(update_file);
+
+        self.action = Action::Update;
+    }
+
+    fn set_action(&mut self, action: Action) {
         if self.action != action {
             self.version += 1;
             self.action = action;
@@ -25,7 +43,9 @@ impl Default for State {
     fn default() -> Self {
         Self {
             version: 0,
-            action: Action::Stop
+            update_version: 0,
+            action: Action::Stop,
+            update_file: None
         }
     }
 }

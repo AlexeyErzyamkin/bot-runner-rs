@@ -17,7 +17,7 @@ use shared::models::{
 enum WorkerCommand {
     Stop,
     Start,
-    //Update,
+    Update(u32),
     Quit
 }
 
@@ -52,24 +52,20 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinH
             match reqwest::get("http://127.0.0.1:8081/bot-runner/state") {
                 Ok(ref mut response) if response.status().is_success() => {
                     let status: WorkerInfo = response.json().unwrap();
-                    // dbg!(&status);
 
                     if status.version > prev_status.version {
+                        tx.send(WorkerCommand::Stop).unwrap();
+
+                        if status.update_version > prev_status.update_version {
+                            tx.send(WorkerCommand::Update(status.update_version)).unwrap();
+                        }
+
                         match status.action {
-                            WorkerAction::Stop => {
-                                tx.send(WorkerCommand::Stop).unwrap();
-                            },
                             WorkerAction::Start => {
                                 tx.send(WorkerCommand::Start).unwrap();
                             },
-                            WorkerAction::Update => {
-                                let file_name = format!("update{}.zip", status.version);
-                                let mut file = std::fs::File::create(file_name).unwrap();
-                                let bytes_read = reqwest::get("http://127.0.0.1:8081/bot-runner/update")
-                                    .unwrap()
-                                    .copy_to(&mut file)
-                                    .unwrap();
-                            }
+                            WorkerAction::Stop => (),
+                            WorkerAction::Update => ()
                         };
                     }
                     
@@ -87,10 +83,6 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinH
     })
 }
 
-// fn download_program() {
-//     reqwest::
-// }
-
 fn process(rx: Receiver<WorkerCommand>) -> JoinHandle<()> {
     thread::spawn(move || {
         loop {
@@ -103,10 +95,23 @@ fn process(rx: Receiver<WorkerCommand>) -> JoinHandle<()> {
                 WorkerCommand::Stop => {
                     dbg!("Stopped");
                 }
-                //WorkerCommand::Update => unreachable!()
+                WorkerCommand::Update(update_version) => {
+                    download_update(update_version);
+                }
             }
         }
 
         println!("Process stopped");
     })
+}
+
+fn download_update(update_version: u32) {
+    let file_name = format!("update{}.zip", update_version);
+    let mut file = std::fs::File::create(file_name).unwrap();
+    let bytes_read = reqwest::get("http://127.0.0.1:8081/bot-runner/update")
+        .unwrap()
+        .copy_to(&mut file)
+        .unwrap();
+
+    
 }

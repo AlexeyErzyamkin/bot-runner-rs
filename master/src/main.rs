@@ -45,6 +45,7 @@ fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
 
     let worker_info = WorkerInfo {
         version: state_read.version,
+        update_version: state_read.update_version,
         action: match state_read.action {
             Action::Update => WorkerAction::Update,
             Action::Start => WorkerAction::Start,

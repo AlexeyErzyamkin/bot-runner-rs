@@ -107,7 +107,7 @@ fn handle_input(state: web::Data<RwLock<State>>) {
                 match cmd {
                     "u" => {
                         let mut state = state.write().unwrap();
-                        let update_file = format!("./data/updates/update{}.zip", state.update_version);
+                        let update_file = format!("./data/updates/update{}.zip", state.update_version + 1);
 
                         print!("Archiving to '{}'... ", update_file);
                         
@@ -137,7 +137,7 @@ fn archive_data(path: &str, out_path: &str) -> io::Result<()> {
     let mut zip = ZipWriter::new(arc_file);
 
     let options = FileOptions::default()
-        .compression_method(CompressionMethod::Deflated);
+        .compression_method(CompressionMethod::Stored);
 
     arc_dir(Path::new(path), path, options, &mut zip);
 
@@ -162,7 +162,7 @@ fn arc_dir<P: AsRef<Path>>(path: P, prefix: &str, options: FileOptions, mut zip:
             arc_dir(each_file_path, prefix, options, &mut zip)
         } else if file_type.is_file() {
             println!("File: {:?}", path);
-            println!("      {:?}", each_file_path);
+            // println!("      {:?}", each_file_path);
 
             zip.start_file_from_path(path, options).unwrap();
             let mut from_file = fs::File::open(each_file_path).unwrap();

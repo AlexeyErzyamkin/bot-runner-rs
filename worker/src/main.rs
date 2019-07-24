@@ -125,12 +125,25 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
             match cmd {
                 WorkerCommand::Quit => break,
                 WorkerCommand::Start(start_info) => {
-                    print!("Staring process... ");
-
                     let mut path = PathBuf::from("./data/unpacked");
-                    path.push(start_info.current_dir);
+                    if start_info.current_dir.len() > 0 {
+                        path.push(start_info.current_dir);
+                    }
 
-                    let child = Command::new(start_info.command)
+                    let path = path.canonicalize().unwrap();
+
+                    let command_path = if &start_info.command[..2] == "./" {
+                        let mut command_path = PathBuf::from(&path);
+                        command_path.push(start_info.command);
+
+                        command_path
+                    } else {
+                        PathBuf::from(start_info.command)
+                    };
+
+                    println!("Starting command '{:?}' from '{:?}'", &command_path, &path);
+
+                    let child = Command::new(command_path)
                         .current_dir(path)
                         .args(&start_info.args)
                         .spawn()

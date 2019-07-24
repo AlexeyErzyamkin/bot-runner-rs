@@ -10,31 +10,54 @@ use std::sync::{
     mpsc,
     mpsc::{Sender, Receiver}
 };
+use std::process::{
+    Command, Child
+};
+use std::mem;
 
 use reqwest;
+use reqwest::Url;
+
+use serde::Deserialize;
 
 use zip::{
     ZipArchive,
     read::ZipFile
 };
 
+use shared;
 use shared::models::{
-    WorkerInfo, WorkerAction
+    WorkerInfo, WorkerAction, StartInfo
 };
+
+#[derive(Deserialize)]
+struct WorkerConfig {
+    addr: String
+}
 
 enum WorkerCommand {
     Stop,
-    Start,
+    Start(StartInfo),
     Update(u32),
     Quit
 }
 
-fn main() {
+fn main() -> io::Result<()> {
+    let config_path = Path::new("./data/worker_config.json");
+    let config: WorkerConfig = shared::read_config(config_path)
+        .map_err(|e| {
+            eprintln!("Error reading config");
+            e
+        })?;
+
     let stop_flag = Arc::new(AtomicBool::default());
     let (tx, rx) = mpsc::channel();
 
-    let us_thread_handle = update_status(stop_flag.clone(), tx);
-    let p_thread_handle = process(rx);
+    let download_url = Url::parse(&config.addr).unwrap().join("/bot-runner/update").unwrap();
+    let state_url = Url::parse(&config.addr).unwrap().join("/bot-runner/state").unwrap();
+
+    let us_thread_handle = update_status(stop_flag.clone(), tx, state_url);
+    let p_thread_handle = process(rx, download_url);
 
     println!("Press ENTER to exit...");
 
@@ -45,9 +68,11 @@ fn main() {
 
     us_thread_handle.join().unwrap();
     p_thread_handle.join().unwrap();
+
+    Ok(())
 }
 
-fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinHandle<()> {
+fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>, addr: Url) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut prev_status = WorkerInfo::default();
 
@@ -57,7 +82,7 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinH
                 break;
             }
 
-            match reqwest::get("http://127.0.0.1:8081/bot-runner/state") {
+            match reqwest::get(addr.clone()) {
                 Ok(ref mut response) if response.status().is_success() => {
                     let status: WorkerInfo = response.json().unwrap();
 
@@ -70,7 +95,7 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinH
 
                         match status.action {
                             WorkerAction::Start => {
-                                tx.send(WorkerCommand::Start).unwrap();
+                                tx.send(WorkerCommand::Start(status.start_info.clone())).unwrap();
                             },
                             WorkerAction::Stop => (),
                             WorkerAction::Update => ()
@@ -91,20 +116,42 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>) -> JoinH
     })
 }
 
-fn process(rx: Receiver<WorkerCommand>) -> JoinHandle<()> {
+fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
     thread::spawn(move || {
+        let mut started_process = None;
+
         loop {
             let cmd = rx.recv().unwrap();
             match cmd {
                 WorkerCommand::Quit => break,
-                WorkerCommand::Start => {
-                    dbg!("Started");
+                WorkerCommand::Start(start_info) => {
+                    print!("Staring process... ");
+
+                    let mut path = PathBuf::from("./data/unpacked");
+                    path.push(start_info.current_dir);
+
+                    let child = Command::new(start_info.command)
+                        .current_dir(path)
+                        .args(&start_info.args)
+                        .spawn()
+                        .expect("Can't start process");
+
+                    let child_id = child.id();
+                    started_process = Some(child);
+
+                    println!("Done. ID={}", child_id);
                 },
                 WorkerCommand::Stop => {
-                    dbg!("Stopped");
+                    if let Some(mut child) = mem::replace(&mut started_process, None) {
+                        print!("Stopping process... ");
+                        
+                        child.kill().unwrap_or_else(|e| eprintln!("Error KILL process: {:?}", e));
+
+                        println!("Done")
+                    }
                 }
                 WorkerCommand::Update(update_version) => {
-                    download_update(update_version);
+                    download_update(update_version, download_url.clone());
                 }
             }
         }
@@ -113,24 +160,26 @@ fn process(rx: Receiver<WorkerCommand>) -> JoinHandle<()> {
     })
 }
 
-fn download_update(update_version: u32) {
+fn download_update(update_version: u32, addr: Url) {
     print!("Downloading update {}... ", update_version);
 
     let file_name = format!("./data/download/update{}.zip", update_version);
     let mut file = std::fs::File::create(&file_name).unwrap();
-    let _bytes_read = reqwest::get("http://127.0.0.1:8081/bot-runner/update")
+    let _bytes_read = reqwest::get(addr)
         .unwrap()
         .copy_to(&mut file)
         .unwrap();
 
     println!("Done");
 
+    print!("Extracting {:?}...", &file_name);
+
     unarchive_data(&file_name, "./data/unpacked").unwrap();
+
+    println!("Done");
 }
 
 fn unarchive_data(path: &str, out_path: &str) -> io::Result<()> {
-    println!("Extracting {:?}...", &path);
-
     let file = fs::File::open(path)?;
     let mut archive = ZipArchive::new(file)?;
 
@@ -140,7 +189,7 @@ fn unarchive_data(path: &str, out_path: &str) -> io::Result<()> {
         let mut path = PathBuf::from(out_path);
         path.push(zip_file.sanitized_name());
 
-        println!("{:?}", &path);
+        // println!("{:?}", &path);
 
         if zip_file.name().chars().rev().next().map_or(false, |c| c == '/' || c == '\\') {
             fs::create_dir_all(path).unwrap();
@@ -153,8 +202,6 @@ fn unarchive_data(path: &str, out_path: &str) -> io::Result<()> {
             io::copy(&mut zip_file, &mut out_file).unwrap();
         }
     }
-
-    println!("Done");
 
     Ok(())
 }

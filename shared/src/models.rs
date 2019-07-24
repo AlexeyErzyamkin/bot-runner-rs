@@ -1,4 +1,5 @@
 use std::default::Default;
+// use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
@@ -15,7 +16,14 @@ pub struct WorkerInfo {
     pub update_version: u32,
     pub action: WorkerAction,
     pub update_url: String,
-    pub start_command_line: String
+    pub start_info: StartInfo
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StartInfo {
+    pub command: String,
+    pub current_dir: String,
+    pub args: Vec<String>,
 }
 
 impl Default for WorkerInfo {
@@ -25,7 +33,17 @@ impl Default for WorkerInfo {
             update_version: 0,
             action: WorkerAction::Stop,
             update_url: String::new(),
-            start_command_line: String::new()
+            start_info: StartInfo::default()
+        }
+    }
+}
+
+impl Default for StartInfo {
+    fn default() -> Self {
+        Self {
+            command: String::new(),
+            current_dir: String::new(),
+            args: Vec::new()
         }
     }
 }

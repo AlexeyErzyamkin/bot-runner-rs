@@ -94,8 +94,8 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>, addr: Ur
                         }
 
                         match status.action {
-                            WorkerAction::Start => {
-                                tx.send(WorkerCommand::Start(status.start_info.clone())).unwrap();
+                            WorkerAction::Start(ref start_info) => {
+                                tx.send(WorkerCommand::Start(start_info.clone())).unwrap();
                             },
                             WorkerAction::Stop => (),
                             WorkerAction::Update => ()

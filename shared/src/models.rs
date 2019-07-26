@@ -1,11 +1,10 @@
 use std::default::Default;
-// use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum WorkerAction {
-    Start,
+    Start(StartInfo),
     Stop,
     Update
 }
@@ -15,8 +14,7 @@ pub struct WorkerInfo {
     pub version: u32,
     pub update_version: u32,
     pub action: WorkerAction,
-    pub update_url: String,
-    pub start_info: StartInfo
+    // pub start_info: Option<StartInfo>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -32,8 +30,7 @@ impl Default for WorkerInfo {
             version: 0,
             update_version: 0,
             action: WorkerAction::Stop,
-            update_url: String::new(),
-            start_info: StartInfo::default()
+            // start_info: None
         }
     }
 }

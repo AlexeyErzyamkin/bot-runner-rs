@@ -1,9 +1,14 @@
 {
     "addr": "127.0.0.1:8081",
     "data_path": "C:\\dev\\c#\\bot-runner\\src\\BotExecutable\\bin\\Debug\\netcoreapp2.2",
-    "start_info": {
-        "command": "dotnet",
-        "current_dir": "",
-        "args": [".\\BotExecutable.dll", "100000000"]
+    "start_infos": {
+        "1": {
+            "command": "dotnet",
+            "current_dir": "",
+            "args": [
+                ".\\BotExecutable.dll",
+                "100000000"
+            ]
+        }
     }
 }

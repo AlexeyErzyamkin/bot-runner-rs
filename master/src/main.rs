@@ -6,6 +6,7 @@ use std::sync::{
     Arc
 };
 use std::thread;
+use std::collections::HashMap;
 
 use actix_web::{
     HttpServer,
@@ -39,7 +40,7 @@ use state::{State, Action};
 struct MasterConfig {
     addr: String,
     data_path: String,
-    start_info: StartInfo
+    start_infos: HashMap<String, StartInfo>
 }
 
 fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
@@ -50,11 +51,15 @@ fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
         update_version: state_read.update_version,
         action: match state_read.action {
             Action::Update => WorkerAction::Update,
-            Action::Start => WorkerAction::Start,
+            Action::Start(ref start_info) => {
+                let start_info = state_read.start_infos
+                    .get(start_info)
+                    .expect("Start info must be present");
+
+                WorkerAction::Start(start_info.clone())
+            },
             Action::Stop => WorkerAction::Stop
-        },
-        update_url: "".to_string(),
-        start_info: state_read.start_info.clone()
+        }
     };
 
     web::Json(worker_info)
@@ -78,7 +83,13 @@ fn main() -> std::io::Result<()> {
             e
         })?;
 
-    let data = web::Data::new(RwLock::new(State::new(config.start_info)));
+    if config.start_infos.is_empty() {
+        eprintln!("Start infos collection is empty");
+
+        return Err(io::ErrorKind::InvalidData.into());
+    }
+
+    let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
 
     handle_input(data.clone(), config.data_path);
 
@@ -112,10 +123,10 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
             let len = io::stdin().read_line(&mut buf).expect("Read input failed");
 
             if len > 0 {
-                let cmd = &buf[..1];
+                let mut cmd = buf.split_whitespace();
 
-                match cmd {
-                    "u" => {
+                match cmd.next() {
+                    Some("u") => {
                         let update_file = format!("./data/updates/update{}.zip", (state.read().unwrap()).update_version + 1);
 
                         print!("Archiving to '{}'... ", update_file);
@@ -124,12 +135,36 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                         
                         println!("Done");
 
-                        (*state.write().unwrap()).update(update_file);
+                        state.write().unwrap().update(update_file);
                     },
-                    "r" => (*state.write().unwrap()).start(),
-                    "s" => (*state.write().unwrap()).stop(),
+                    Some("r") => {
+                        match cmd.next() {
+                            Some(si) => {
+                                let key_exists = state.read().unwrap().start_infos.contains_key(si);
+                                if key_exists {
+                                    state.write().unwrap().start(si.to_string());
+                                } else {
+                                    eprintln!("Key {} not present in start infos", si);
+                                }
+                            },
+                            None => {
+                                let mut state_write = state.write().unwrap();
+                                match state_write.last_start_info.take() {
+                                    Some(lsi) => {
+                                        state_write.start(lsi);
+                                    },
+                                    None => {
+                                        let first_key = state_write.start_infos.keys().cloned().next().expect("Start infos collection is empty");
+
+                                        state_write.start(first_key.to_owned());
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    Some("s") => state.write().unwrap().stop(),
                     _ => {
-                        eprintln!("Invalid command: {}", cmd);
+                        eprintln!("Invalid command: {}", &buf);
 
                         continue;
                     }

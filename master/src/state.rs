@@ -1,11 +1,11 @@
-// use std::default::Default;
+use std::collections::HashMap;
 
 use shared::models::StartInfo;
 
 #[derive(PartialEq)]
 pub enum Action {
     Stop,
-    Start,
+    Start(String),
     Update
 }
 
@@ -14,22 +14,24 @@ pub struct State {
     pub update_version: u32,
     pub action: Action,
     pub update_file: Option<String>,
-    pub start_info: StartInfo
+    pub last_start_info: Option<String>,
+    pub start_infos: HashMap<String, StartInfo>
 }
 
 impl State {
-    pub fn new(start_info: StartInfo) -> Self {
+    pub fn new(start_infos: HashMap<String, StartInfo>) -> Self {
         Self {
             version: 0,
             update_version: 0,
             action: Action::Stop,
             update_file: None,
-            start_info
+            last_start_info: None,
+            start_infos
         }
     }
 
-    pub fn start(&mut self) {
-        self.set_action(Action::Start);
+    pub fn start(&mut self, start_info: String) {
+        self.set_action(Action::Start(start_info));
     }
 
     pub fn stop(&mut self) {
@@ -44,10 +46,11 @@ impl State {
         self.action = Action::Update;
     }
 
-    fn set_action(&mut self, action: Action) {
+    fn set_action(&mut self, action: Action ) { //, start_info: Option<String>) {
         if self.action != action {
             self.version += 1;
             self.action = action;
+            // self.start_info = start_info;
         }
     }
 }

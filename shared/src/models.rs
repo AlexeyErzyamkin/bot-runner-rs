@@ -13,12 +13,12 @@ pub enum WorkerAction {
 pub struct WorkerInfo {
     pub version: u32,
     pub update_version: u32,
-    pub action: WorkerAction,
-    // pub start_info: Option<StartInfo>
+    pub action: WorkerAction
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StartInfo {
+    pub update_version: u32,
     pub command: String,
     pub current_dir: String,
     pub args: Vec<String>,
@@ -29,8 +29,7 @@ impl Default for WorkerInfo {
         Self {
             version: 0,
             update_version: 0,
-            action: WorkerAction::Stop,
-            // start_info: None
+            action: WorkerAction::Stop
         }
     }
 }
@@ -40,7 +39,8 @@ impl Default for StartInfo {
         Self {
             command: String::new(),
             current_dir: String::new(),
-            args: Vec::new()
+            args: Vec::new(),
+            update_version: 0
         }
     }
 }

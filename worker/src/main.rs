@@ -10,9 +10,7 @@ use std::sync::{
     mpsc,
     mpsc::{Sender, Receiver}
 };
-use std::process::{
-    Command, Child
-};
+use std::process::Command;
 use std::mem;
 
 use reqwest;
@@ -20,15 +18,15 @@ use reqwest::Url;
 
 use serde::Deserialize;
 
-use zip::{
-    ZipArchive,
-    read::ZipFile
-};
-
 use shared;
 use shared::models::{
     WorkerInfo, WorkerAction, StartInfo
 };
+use shared::{URL_SCOPE, URL_STATE, URL_UPDATE};
+use shared::archiving;
+
+const PATH_DATA: &str = "data/unpacked";
+const PATH_DOWNLOAD: &str = "data/download";
 
 #[derive(Deserialize)]
 struct WorkerConfig {
@@ -43,18 +41,17 @@ enum WorkerCommand {
 }
 
 fn main() -> io::Result<()> {
+    prepare_environment()?;
+
     let config_path = Path::new("./data/worker_config.json");
-    let config: WorkerConfig = shared::read_config(config_path)
-        .map_err(|e| {
-            eprintln!("Error reading config");
-            e
-        })?;
+    let config: WorkerConfig = shared::read_config(config_path)?;
 
     let stop_flag = Arc::new(AtomicBool::default());
     let (tx, rx) = mpsc::channel();
 
-    let download_url = Url::parse(&config.addr).unwrap().join("/bot-runner/update").unwrap();
-    let state_url = Url::parse(&config.addr).unwrap().join("/bot-runner/state").unwrap();
+    let scope_url = Url::parse(&config.addr).unwrap().join(URL_SCOPE).unwrap();
+    let download_url = scope_url.join(URL_UPDATE).unwrap();
+    let state_url = scope_url.join(URL_STATE).unwrap();
 
     let us_thread_handle = update_status(stop_flag.clone(), tx, state_url);
     let p_thread_handle = process(rx, download_url);
@@ -68,6 +65,13 @@ fn main() -> io::Result<()> {
 
     us_thread_handle.join().unwrap();
     p_thread_handle.join().unwrap();
+
+    Ok(())
+}
+
+fn prepare_environment() -> io::Result<()> {
+    fs::create_dir_all(PATH_DATA)?;
+    fs::create_dir_all(PATH_DOWNLOAD)?;
 
     Ok(())
 }
@@ -119,40 +123,46 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>, addr: Ur
 fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut started_process = None;
+        let mut current_update_version = None;
 
         loop {
             let cmd = rx.recv().unwrap();
             match cmd {
                 WorkerCommand::Quit => break,
                 WorkerCommand::Start(start_info) => {
-                    let mut path = PathBuf::from("./data/unpacked");
-                    if start_info.current_dir.len() > 0 {
-                        path.push(start_info.current_dir);
+                    match current_update_version {
+                        Some(update_version) if update_version == start_info.update_version => {
+                            let mut path = PathBuf::from(PATH_DATA);
+                            if start_info.current_dir.len() > 0 {
+                                path.push(start_info.current_dir);
+                            }
+
+                            let path = path.canonicalize().unwrap();
+
+                            let command_path = if &start_info.command[..2] == "./" {
+                                let mut command_path = PathBuf::from(&path);
+                                command_path.push(start_info.command);
+
+                                command_path
+                            } else {
+                                PathBuf::from(start_info.command)
+                            };
+
+                            println!("Starting command '{:?}' from '{:?}'", &command_path, &path);
+
+                            let child = Command::new(command_path)
+                                .current_dir(path)
+                                .args(&start_info.args)
+                                .spawn()
+                                .expect("Can't start process");
+
+                            let child_id = child.id();
+                            started_process = Some(child);
+
+                            println!("Done. ID={}", child_id);
+                        },
+                        _ => eprintln!("Can't start process: Invalid update version")
                     }
-
-                    let path = path.canonicalize().unwrap();
-
-                    let command_path = if &start_info.command[..2] == "./" {
-                        let mut command_path = PathBuf::from(&path);
-                        command_path.push(start_info.command);
-
-                        command_path
-                    } else {
-                        PathBuf::from(start_info.command)
-                    };
-
-                    println!("Starting command '{:?}' from '{:?}'", &command_path, &path);
-
-                    let child = Command::new(command_path)
-                        .current_dir(path)
-                        .args(&start_info.args)
-                        .spawn()
-                        .expect("Can't start process");
-
-                    let child_id = child.id();
-                    started_process = Some(child);
-
-                    println!("Done. ID={}", child_id);
                 },
                 WorkerCommand::Stop => {
                     if let Some(mut child) = mem::replace(&mut started_process, None) {
@@ -164,7 +174,9 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
                     }
                 }
                 WorkerCommand::Update(update_version) => {
-                    download_update(update_version, download_url.clone());
+                    if let Ok(_) = download_update(update_version, download_url.clone()) {
+                        current_update_version = Some(update_version);
+                    }
                 }
             }
         }
@@ -173,48 +185,27 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
     })
 }
 
-fn download_update(update_version: u32, addr: Url) {
+fn download_update(update_version: u32, addr: Url) -> io::Result<()> {
     print!("Downloading update {}... ", update_version);
 
-    let file_name = format!("./data/download/update{}.zip", update_version);
-    let mut file = std::fs::File::create(&file_name).unwrap();
-    let _bytes_read = reqwest::get(addr)
-        .unwrap()
-        .copy_to(&mut file)
-        .unwrap();
+    let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version);
+
+    let mut file = std::fs::File::create(&file_name)?;
+
+    match reqwest::get(addr) {
+        Ok(ref mut response) if response.status().is_success() => {
+            response.copy_to(&mut file).expect("Can't write to file")
+        },
+        _ => return Err(io::ErrorKind::Other.into())
+    };
 
     println!("Done");
 
     print!("Extracting {:?}...", &file_name);
 
-    unarchive_data(&file_name, "./data/unpacked").unwrap();
+    archiving::unarchive_data(&file_name, PATH_DATA)?;
 
     println!("Done");
-}
-
-fn unarchive_data(path: &str, out_path: &str) -> io::Result<()> {
-    let file = fs::File::open(path)?;
-    let mut archive = ZipArchive::new(file)?;
-
-    for index in 0..archive.len() {
-        let mut zip_file = archive.by_index(index)?;
-
-        let mut path = PathBuf::from(out_path);
-        path.push(zip_file.sanitized_name());
-
-        // println!("{:?}", &path);
-
-        if zip_file.name().chars().rev().next().map_or(false, |c| c == '/' || c == '\\') {
-            fs::create_dir_all(path).unwrap();
-        } else {
-            if let Some(parent_dir) = path.parent() {
-                fs::create_dir_all(parent_dir).unwrap();
-            }
-
-            let mut out_file = fs::File::create(path).unwrap();
-            io::copy(&mut zip_file, &mut out_file).unwrap();
-        }
-    }
 
     Ok(())
 }

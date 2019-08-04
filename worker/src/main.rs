@@ -20,9 +20,9 @@ use serde::Deserialize;
 
 use shared;
 use shared::models::{
-    WorkerInfo, WorkerAction, StartInfo
+    WorkerInfo, WorkerAction, StartInfo, UpdateVersion
 };
-use shared::{URL_SCOPE, URL_STATE, URL_UPDATE};
+use shared::{ URL_SCOPE, URL_STATE, URL_UPDATE };
 use shared::archiving;
 
 const PATH_DATA: &str = "data/unpacked";
@@ -36,7 +36,7 @@ struct WorkerConfig {
 enum WorkerCommand {
     Stop,
     Start(StartInfo),
-    Update(u32),
+    Update(UpdateVersion),
     Quit
 }
 
@@ -49,9 +49,12 @@ fn main() -> io::Result<()> {
     let stop_flag = Arc::new(AtomicBool::default());
     let (tx, rx) = mpsc::channel();
 
-    let scope_url = Url::parse(&config.addr).unwrap().join(URL_SCOPE).unwrap();
-    let download_url = scope_url.join(URL_UPDATE).unwrap();
-    let state_url = scope_url.join(URL_STATE).unwrap();
+    let base_url = Url::parse(&config.addr).unwrap();
+    let download_url = base_url.join(&format!("{}{}", URL_SCOPE, URL_UPDATE)).unwrap();
+    let state_url = base_url.join(&format!("{}{}", URL_SCOPE, URL_STATE)).unwrap();
+
+    println!("State URL: {:?}", state_url);
+    println!("State URL: {:?}", download_url);
 
     let us_thread_handle = update_status(stop_flag.clone(), tx, state_url);
     let p_thread_handle = process(rx, download_url);
@@ -108,8 +111,11 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>, addr: Ur
                     
                     prev_status = status;
                 },
-                _ => {
-                    eprintln!("Error updating status");
+                Ok(ref response) => {
+                    eprintln!("Response status: {:?}", response.status());
+                },
+                Err(e) => {
+                    eprintln!("Error updating status: {:?}", e);
                 }
             }
 
@@ -123,45 +129,56 @@ fn update_status(stop_flag: Arc<AtomicBool>, tx: Sender<WorkerCommand>, addr: Ur
 fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut started_process = None;
-        let mut current_update_version = None;
 
         loop {
             let cmd = rx.recv().unwrap();
             match cmd {
                 WorkerCommand::Quit => break,
                 WorkerCommand::Start(start_info) => {
-                    match current_update_version {
-                        Some(update_version) if update_version == start_info.update_version => {
-                            let mut path = PathBuf::from(PATH_DATA);
-                            if start_info.current_dir.len() > 0 {
-                                path.push(start_info.current_dir);
-                            }
+                    let mut path = PathBuf::from(PATH_DATA);
+                    if start_info.current_dir.len() > 0 {
+                        path.push(start_info.current_dir);
+                    }
 
-                            let path = path.canonicalize().unwrap();
+                    let path = path;
+                    // let path = path.canonicalize().unwrap();
 
-                            let command_path = if &start_info.command[..2] == "./" {
-                                let mut command_path = PathBuf::from(&path);
-                                command_path.push(start_info.command);
+                    let (is_relative, file_name) = {
+                        if &start_info.command[..2] == "./" {
+                            (true, &start_info.command[2..])
+                        } else if &start_info.command[..3] == ".\\" {
+                            (true, &start_info.command[3..])
+                        } else {
+                            (false, &start_info.command[..])
+                        }
+                    };
 
-                                command_path
-                            } else {
-                                PathBuf::from(start_info.command)
-                            };
+                    let command_path = if is_relative {
+                        let mut command_path = PathBuf::from(&path);
+                        command_path.push(file_name);
 
-                            println!("Starting command '{:?}' from '{:?}'", &command_path, &path);
+                        command_path
+                    } else {
+                        PathBuf::from(file_name)
+                    };
 
-                            let child = Command::new(command_path)
-                                .current_dir(path)
-                                .args(&start_info.args)
-                                .spawn()
-                                .expect("Can't start process");
+                    println!("Starting command '{:?}' from '{:?}'", &command_path, &path);
 
+                    let spawn_result = Command::new(command_path)
+                        .current_dir(path)
+                        .args(&start_info.args)
+                        .spawn();
+
+                    match spawn_result {
+                        Ok(child) => {
                             let child_id = child.id();
                             started_process = Some(child);
 
                             println!("Done. ID={}", child_id);
                         },
-                        _ => eprintln!("Can't start process: Invalid update version")
+                        Err(e) => {
+                            eprintln!("Error spawning process: {:?}", e);
+                        }
                     }
                 },
                 WorkerCommand::Stop => {
@@ -170,12 +187,19 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
                         
                         child.kill().unwrap_or_else(|e| eprintln!("Error KILL process: {:?}", e));
 
-                        println!("Done")
+                        println!("Done");
                     }
                 }
                 WorkerCommand::Update(update_version) => {
-                    if let Ok(_) = download_update(update_version, download_url.clone()) {
-                        current_update_version = Some(update_version);
+                    loop {
+                        match download_update(update_version, download_url.clone()) {
+                            Ok(()) => break,
+                            Err(e) => {
+                                eprintln!("Error download update: {:?}", e);
+                                
+                                thread::sleep(std::time::Duration::from_secs(5));
+                            }
+                        }
                     }
                 }
             }
@@ -185,10 +209,10 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
     })
 }
 
-fn download_update(update_version: u32, addr: Url) -> io::Result<()> {
-    print!("Downloading update {}... ", update_version);
+fn download_update(update_version: UpdateVersion, addr: Url) -> io::Result<()> {
+    print!("Downloading update {}... ", update_version.0);
 
-    let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version);
+    let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version.0);
 
     let mut file = std::fs::File::create(&file_name)?;
 

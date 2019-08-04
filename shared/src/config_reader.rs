@@ -14,6 +14,10 @@ pub fn read_config<'a, T, P>(path: P) -> io::Result<T>
 
     match serde_json::from_reader(reader) {
         Ok(obj) => Ok(obj),
-        Err(_) => Err(io::ErrorKind::InvalidData.into())
+        Err(e) => {
+            eprintln!("Error parsing config: {:?}", e);
+            
+            Err(io::ErrorKind::InvalidData.into())
+        }
     }
 }

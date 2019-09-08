@@ -5,29 +5,18 @@ use std::sync::RwLock;
 use std::thread;
 use std::collections::HashMap;
 
-use actix_web::{
-    HttpServer,
-    Responder,
-    App,
-    web
-};
-
-use actix_files::NamedFile;
-
 use serde::Deserialize;
 
 use shared;
 use shared::models::{
-    WorkerInfo,
-    WorkerAction,
     StartInfo
 };
 use shared::archiving;
-use shared::{ URL_SCOPE, URL_STATE, URL_UPDATE };
 
-mod state;
+use actix_web::web;
 
-use state::{State, Action};
+use master::state::State;
+use master::server;
 
 const PATH_UPDATES: &str = "data/updates";
 
@@ -38,41 +27,35 @@ struct MasterConfig {
     start_infos: HashMap<String, StartInfo>
 }
 
-fn get_state(state: web::Data<RwLock<State>>) -> impl Responder {
-    let state_read = state.read().unwrap();
-
-    let worker_info = WorkerInfo {
-        version: state_read.version,
-        update_version: state_read.update_version,
-        action: match state_read.action {
-            Action::Update => WorkerAction::Update,
-            Action::Start(ref start_info) => {
-                let start_info = state_read.start_infos
-                    .get(start_info)
-                    .expect("Start info must be present");
-
-                WorkerAction::Start(start_info.clone())
-            },
-            Action::Stop => WorkerAction::Stop
-        }
-    };
-
-    web::Json(worker_info)
-}
-
-fn get_update(state: web::Data<RwLock<State>>) -> impl Responder {
-    let state_read = state.read().unwrap();
-
-    if let Some(update_file) = &state_read.update_file {
-        return Some(NamedFile::open(update_file));
-    }
-
-    None
+fn print_help() {
+    println!("BotRunner-RS by Alexey V. Erzyamkin");
+    println!("   Commands:");
+    println!("      h - this help");
+    println!("      u - update files");
+    println!("      c - read configurations");
+    println!("      r <name> - run configuration with <name>");
+    println!("      s - stop");
 }
 
 fn main() -> io::Result<()> {
     prepare_environment()?;
+    print_help();
 
+    let config = read_config()?;
+
+    let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
+
+    handle_input(data.clone(), config.data_path);
+    server::run(data, config.addr)
+}
+
+fn prepare_environment() -> io::Result<()> {
+    fs::create_dir_all(PATH_UPDATES)?;
+    
+    Ok(())
+}
+
+fn read_config() -> io::Result<MasterConfig> {
     let config_path = Path::new("./data/master_config.json");
     let config: MasterConfig = shared::read_config(config_path)?;
 
@@ -82,37 +65,7 @@ fn main() -> io::Result<()> {
         return Err(io::ErrorKind::InvalidData.into());
     }
 
-    let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
-
-    handle_input(data.clone(), config.data_path);
-
-    let handlers = move || {
-        App::new()
-            .register_data(data.clone())
-            .service(
-                web::scope(URL_SCOPE)
-                    .service(
-                        web::resource(URL_STATE).to(get_state)
-                    )
-                    .service(
-                        web::resource(URL_UPDATE).to(get_update)
-                    )
-            )
-    };
-
-    println!("Master started");
-
-    HttpServer::new(handlers)
-        .bind(config.addr)?
-        .run()
-
-    // Ok(())
-}
-
-fn prepare_environment() -> io::Result<()> {
-    fs::create_dir_all(PATH_UPDATES)?;
-    
-    Ok(())
+    Ok(config)
 }
 
 fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
@@ -125,6 +78,16 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                 let mut cmd = buf.split_whitespace();
 
                 match cmd.next() {
+                    Some("h") => {
+                        print_help();
+                    },
+                    Some("c") => {
+                        if let Ok(new_config) = read_config() {
+                            (state.write().unwrap()).start_infos = new_config.start_infos;
+                        } else {
+                            eprintln!("Error reading config file");
+                        }
+                    },
                     Some("u") => {
                         let update_file = format!("{}/{}.zip", PATH_UPDATES, (state.read().unwrap()).update_version.0 + 1);
 

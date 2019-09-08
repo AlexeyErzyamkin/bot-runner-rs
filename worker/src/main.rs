@@ -19,11 +19,11 @@ use reqwest::Url;
 use serde::Deserialize;
 
 use shared;
-use shared::models::{
-    WorkerInfo, WorkerAction, StartInfo, UpdateVersion
-};
+use shared::models::{ WorkerInfo, WorkerAction, UpdateVersion };
 use shared::{ URL_SCOPE, URL_STATE, URL_UPDATE };
 use shared::archiving;
+
+use worker::WorkerCommand;
 
 const PATH_DATA: &str = "data/unpacked";
 const PATH_DOWNLOAD: &str = "data/download";
@@ -31,13 +31,6 @@ const PATH_DOWNLOAD: &str = "data/download";
 #[derive(Deserialize)]
 struct WorkerConfig {
     addr: String
-}
-
-enum WorkerCommand {
-    Stop,
-    Start(StartInfo),
-    Update(UpdateVersion),
-    Quit
 }
 
 fn main() -> io::Result<()> {

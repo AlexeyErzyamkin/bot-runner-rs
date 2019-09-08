@@ -46,22 +46,10 @@ impl State {
         self.action = Action::Update;
     }
 
-    fn set_action(&mut self, action: Action ) { //, start_info: Option<String>) {
+    fn set_action(&mut self, action: Action ) {
         if self.action != action {
             self.version.0 += 1;
             self.action = action;
-            // self.start_info = start_info;
         }
     }
 }
-
-// impl Default for State {
-//     fn default() -> Self {
-//         Self {
-//             version: 0,
-//             update_version: 0,
-//             action: Action::Stop,
-//             update_file: None
-//         }
-//     }
-// }

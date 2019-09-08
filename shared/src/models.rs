@@ -5,20 +5,8 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct UpdateVersion(pub u32);
 
-// impl UpdateVersion {
-//     pub fn next(&self) -> Self {
-//         Self(self.0 + 1)
-//     }
-// }
-
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct StateVersion(pub u32);
-
-// impl StateVersion {
-//     pub fn next(&self) -> Self {
-//         Self(self.0 + 1)
-//     }
-// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum WorkerAction {
@@ -34,11 +22,12 @@ pub struct WorkerInfo {
     pub action: WorkerAction
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct StartInfo {
-    pub command: String,
-    pub current_dir: String,
-    pub args: Vec<String>,
+impl WorkerInfo {
+    pub fn new(version: StateVersion, update_version: UpdateVersion, action: WorkerAction) -> Self {
+        Self {
+            version, update_version, action
+        }
+    }
 }
 
 impl Default for WorkerInfo {
@@ -49,6 +38,13 @@ impl Default for WorkerInfo {
             action: WorkerAction::Stop
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StartInfo {
+    pub command: String,
+    pub current_dir: String,
+    pub args: Vec<String>,
 }
 
 impl Default for StartInfo {

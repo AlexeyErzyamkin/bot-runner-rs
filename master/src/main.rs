@@ -1,31 +1,19 @@
-use std::path::Path;
 use std::io;
 use std::fs;
 use std::sync::RwLock;
 use std::thread;
-use std::collections::HashMap;
-
-use serde::Deserialize;
 
 use shared;
-use shared::models::{
-    StartInfo
-};
 use shared::archiving;
 
 use actix_web::web;
 
 use master::state::State;
 use master::server;
+use master::config;
 
 const PATH_UPDATES: &str = "data/updates";
-
-#[derive(Deserialize)]
-struct MasterConfig {
-    addr: String,
-    data_path: String,
-    start_infos: HashMap<String, StartInfo>
-}
+const PATH_CONFIG: &str = "./data/master_config.json";
 
 fn print_help() {
     println!("BotRunner-RS by Alexey V. Erzyamkin");
@@ -41,7 +29,7 @@ fn main() -> io::Result<()> {
     prepare_environment()?;
     print_help();
 
-    let config = read_config()?;
+    let config = config::read(PATH_CONFIG)?;
 
     let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
 
@@ -53,19 +41,6 @@ fn prepare_environment() -> io::Result<()> {
     fs::create_dir_all(PATH_UPDATES)?;
     
     Ok(())
-}
-
-fn read_config() -> io::Result<MasterConfig> {
-    let config_path = Path::new("./data/master_config.json");
-    let config: MasterConfig = shared::read_config(config_path)?;
-
-    if config.start_infos.is_empty() {
-        eprintln!("Start infos collection is empty");
-
-        return Err(io::ErrorKind::InvalidData.into());
-    }
-
-    Ok(config)
 }
 
 fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
@@ -82,7 +57,7 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                         print_help();
                     },
                     Some("c") => {
-                        if let Ok(new_config) = read_config() {
+                        if let Ok(new_config) = config::read(PATH_UPDATES) {
                             (state.write().unwrap()).start_infos = new_config.start_infos;
                         } else {
                             eprintln!("Error reading config file");

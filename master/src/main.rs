@@ -57,7 +57,7 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                         print_help();
                     },
                     Some("c") => {
-                        if let Ok(new_config) = config::read(PATH_UPDATES) {
+                        if let Ok(new_config) = config::read(PATH_CONFIG) {
                             (state.write().unwrap()).start_infos = new_config.start_infos;
                         } else {
                             eprintln!("Error reading config file");

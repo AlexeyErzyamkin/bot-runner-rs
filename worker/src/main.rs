@@ -176,7 +176,7 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
                 },
                 WorkerCommand::Stop => {
                     if let Some(mut child) = mem::replace(&mut started_process, None) {
-                        print!("Stopping process... ");
+                        println!("Stopping process... ");
                         
                         child.kill().unwrap_or_else(|e| eprintln!("Error KILL process: {:?}", e));
 
@@ -203,7 +203,7 @@ fn process(rx: Receiver<WorkerCommand>, download_url: Url) -> JoinHandle<()> {
 }
 
 fn download_update(update_version: UpdateVersion, addr: Url) -> io::Result<()> {
-    print!("Downloading update {}... ", update_version.0);
+    println!("Downloading update {}... ", update_version.0);
 
     let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version.0);
 
@@ -218,7 +218,7 @@ fn download_update(update_version: UpdateVersion, addr: Url) -> io::Result<()> {
 
     println!("Done");
 
-    print!("Extracting {:?}...", &file_name);
+    println!("Extracting {:?}...", &file_name);
 
     archiving::unarchive_data(&file_name, PATH_DATA)?;
 

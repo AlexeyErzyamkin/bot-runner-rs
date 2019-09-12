@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap};
 
 use shared::models::{ StartInfo, UpdateVersion, StateVersion };
 
@@ -9,6 +9,7 @@ pub enum Action {
     Update
 }
 
+/// Holds current state of master
 pub struct State {
     pub version: StateVersion,
     pub update_version: UpdateVersion,

@@ -25,7 +25,9 @@ pub struct WorkerInfo {
 impl WorkerInfo {
     pub fn new(version: StateVersion, update_version: UpdateVersion, action: WorkerAction) -> Self {
         Self {
-            version, update_version, action
+            version,
+            update_version,
+            action
         }
     }
 }

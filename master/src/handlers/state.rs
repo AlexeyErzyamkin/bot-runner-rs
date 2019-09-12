@@ -2,7 +2,8 @@ use std::sync::RwLock;
 
 use actix_web::{
     Responder,
-    web
+    web,
+    HttpRequest
 };
 
 use shared;
@@ -12,7 +13,11 @@ use shared::models::{
 };
 use crate::state::{State, Action};
 
-pub fn handle_state(state: web::Data<RwLock<State>>) -> impl Responder {
+pub fn handle_state(request: HttpRequest, state: web::Data<RwLock<State>>) -> impl Responder {
+    if let Some(remote_ip) = request.connection_info().remote() {
+        println!("Remote IP: {}", remote_ip);
+    }
+
     let state_read = state.read().unwrap();
 
     let action = match state_read.action {

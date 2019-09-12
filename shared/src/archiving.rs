@@ -32,10 +32,14 @@ fn arc_dir<P: AsRef<Path>>(path: P, prefix: &str, options: FileOptions, mut zip:
         let path = each_file_path.strip_prefix(Path::new(prefix)).expect("Can't strip prefix");
 
         if file_type.is_dir() {
+            println!("   Dir: {}", path.display());
+
             zip.add_directory_from_path(path, options)?;
 
             arc_dir(each_file_path, prefix, options, &mut zip)?;
         } else if file_type.is_file() {
+            println!("   File: {}", path.display());
+
             zip.start_file_from_path(path, options)?;
             let mut from_file = fs::File::open(each_file_path)?;
             io::copy(&mut from_file, &mut zip)?;
@@ -56,11 +60,15 @@ pub fn unarchive_data(path: &str, out_path: &str) -> io::Result<()> {
         path.push(zip_file.sanitized_name());
 
         if zip_file.name().chars().rev().next().map_or(false, |c| c == '/' || c == '\\') {
+            println!("   Dir: {}", path.display());
+
             fs::create_dir_all(path)?;
         } else {
             if let Some(parent_dir) = path.parent() {
                 fs::create_dir_all(parent_dir)?;
             }
+
+            println!("   File: {}", path.display());
 
             let mut out_file = fs::File::create(path)?;
             io::copy(&mut zip_file, &mut out_file)?;

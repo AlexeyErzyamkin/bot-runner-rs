@@ -1,5 +1,6 @@
-use std::io;
 use std::fs;
+use std::io;
+use std::io::Write;
 use std::sync::RwLock;
 use std::thread;
 
@@ -8,9 +9,9 @@ use shared::archiving;
 
 use actix_web::web;
 
-use master::state::State;
-use master::server;
 use master::config;
+use master::server;
+use master::state::State;
 
 const PATH_UPDATES: &str = "data/updates";
 const PATH_CONFIG: &str = "./data/master_config.json";
@@ -39,7 +40,7 @@ fn main() -> io::Result<()> {
 
 fn prepare_environment() -> io::Result<()> {
     fs::create_dir_all(PATH_UPDATES)?;
-    
+
     Ok(())
 }
 
@@ -69,44 +70,44 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                         print!("Archiving to '{}'... ", update_file);
                         
                         archiving::archive_data(&data_path, &update_file).expect("Archiving failed");
-                        
-                        println!("Done");
+                        } else {
+                            eprintln!("Key {} not present in start infos", si);
+                        }
+                    }
+                    None => {
+                        let mut state_write = state.write().unwrap();
+                        match state_write.last_start_info.take() {
+                            Some(lsi) => {
+                                state_write.start(lsi.to_owned());
 
-                        state.write().unwrap().update(update_file);
-                    },
-                    Some("r") => {
-                        match cmd.next() {
-                            Some(si) => {
-                                let key_exists = state.read().unwrap().start_infos.contains_key(si);
-                                if key_exists {
-                                    state.write().unwrap().start(si.to_string());
-                                } else {
-                                    eprintln!("Key {} not present in start infos", si);
-                                }
-                            },
+                                println!("Start scheduled with last used key {}", lsi);
+                            }
                             None => {
-                                let mut state_write = state.write().unwrap();
-                                match state_write.last_start_info.take() {
-                                    Some(lsi) => {
-                                        state_write.start(lsi);
-                                    },
-                                    None => {
-                                        let first_key = state_write.start_infos.keys().cloned().next().expect("Start infos collection is empty");
+                                let first_key = state_write
+                                    .start_infos
+                                    .keys()
+                                    .cloned()
+                                    .next()
+                                    .expect("Start infos collection is empty");
 
-                                        state_write.start(first_key.to_owned());
-                                    }
-                                }
+                                state_write.start(first_key.to_owned());
+
+                                println!("Start scheduled with first key {}", first_key);
                             }
                         }
-                    },
-                    Some("s") => state.write().unwrap().stop(),
-                    _ => {
-                        eprintln!("Invalid command: {}", &buf);
-
-                        continue;
                     }
-                };
-            }
+                },
+                Some("s") => {
+                    state.write().unwrap().stop();
+
+                    println!("Stop scheduled");
+                },
+                _ => {
+                    eprintln!("Invalid command: {}", &buf);
+
+                    continue;
+                }
+            };
         }
     });
 }

@@ -45,31 +45,52 @@ fn prepare_environment() -> io::Result<()> {
 }
 
 fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
-    thread::spawn(move || {
-        loop {
-            let mut buf = String::new();
-            let len = io::stdin().read_line(&mut buf).expect("Read input failed");
+    thread::spawn(move || loop {
+        let mut buf = String::new();
 
-            if len > 0 {
-                let mut cmd = buf.split_whitespace();
+        print!("# ");
+        io::stdout().flush().unwrap();
 
-                match cmd.next() {
-                    Some("h") => {
-                        print_help();
-                    },
-                    Some("c") => {
-                        if let Ok(new_config) = config::read(PATH_CONFIG) {
-                            (state.write().unwrap()).start_infos = new_config.start_infos;
-                        } else {
-                            eprintln!("Error reading config file");
-                        }
-                    },
-                    Some("u") => {
-                        let update_file = format!("{}/{}.zip", PATH_UPDATES, (state.read().unwrap()).update_version.0 + 1);
+        let len = io::stdin().read_line(&mut buf).expect("Read input failed");
 
-                        print!("Archiving to '{}'... ", update_file);
-                        
-                        archiving::archive_data(&data_path, &update_file).expect("Archiving failed");
+        if len > 0 {
+            let mut cmd = buf.split_whitespace();
+
+            match cmd.next() {
+                Some("h") => {
+                    print_help();
+                }
+                Some("c") => {
+                    if let Ok(new_config) = config::read(PATH_CONFIG) {
+                        state.write().unwrap().start_infos = new_config.start_infos;
+
+                        println!("Successfully read config file");
+                    } else {
+                        eprintln!("Error reading config file");
+                    }
+                }
+                Some("u") => {
+                    let update_file = format!(
+                        "{}/{}.zip",
+                        PATH_UPDATES,
+                        state.read().unwrap().update_version.0 + 1
+                    );
+
+                    println!("Archiving to '{}'... ", update_file);
+
+                    archiving::archive_data(&data_path, &update_file).expect("Archiving failed");
+
+                    println!("Done");
+
+                    state.write().unwrap().update(update_file);
+                }
+                Some("r") => match cmd.next() {
+                    Some(si) => {
+                        let key_exists = state.read().unwrap().start_infos.contains_key(si);
+                        if key_exists {
+                            state.write().unwrap().start(si.to_string());
+
+                            println!("Start scheduled with key {}", si);
                         } else {
                             eprintln!("Key {} not present in start infos", si);
                         }

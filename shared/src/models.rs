@@ -58,3 +58,33 @@ impl Default for StartInfo {
         }
     }
 }
+
+//#[derive(Serialize, Deserialize, Clone, Copy)]
+//pub struct WorkerId(pub u16);
+//
+//impl WorkerId {
+//    pub fn new() -> Self {
+//        Self(0)
+//    }
+//
+//    pub fn to_next(&mut self) -> Self {
+//        self.0 += 1;
+//
+//        Self(self.0)
+//    }
+//}
+
+#[derive(Serialize, Deserialize)]
+pub struct RegisterRequest {
+
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RegisterResponse {
+    pub id: String
+}
+
+//#[derive(Serialize, Deserialize)]
+//pub struct ErrorResponse {
+//    pub error: String
+//}

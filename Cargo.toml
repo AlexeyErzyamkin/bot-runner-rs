@@ -5,5 +5,5 @@ members = [
     "worker",
     "client",
     "shared",
-    "zip_test"
+    "logic"
 ]

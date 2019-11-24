@@ -1,6 +1,7 @@
 use std::collections::{HashMap};
 
 use shared::models::{ StartInfo, UpdateVersion, StateVersion };
+use crate::{ WorkerInfo, WorkerAddr };
 
 #[derive(PartialEq)]
 pub enum Action {
@@ -16,7 +17,8 @@ pub struct State {
     pub action: Action,
     pub update_file: Option<String>,
     pub last_start_info: Option<String>,
-    pub start_infos: HashMap<String, StartInfo>
+    pub start_infos: HashMap<String, StartInfo>,
+    pub worker_infos: HashMap<WorkerAddr, WorkerInfo>
 }
 
 impl State {
@@ -27,7 +29,8 @@ impl State {
             action: Action::Stop,
             update_file: None,
             last_start_info: None,
-            start_infos
+            start_infos,
+            worker_infos: HashMap::new()
         }
     }
 

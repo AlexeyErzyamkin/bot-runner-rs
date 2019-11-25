@@ -4,7 +4,8 @@ use actix::{
 
 use actix_web::{
     web,
-    HttpResponse
+    HttpResponse,
+    ResponseError
 };
 
 use shared;
@@ -22,7 +23,7 @@ use crate::{
 };
 
 pub fn handle_register((_request, state): (web::Json<RegisterRequest>, web::Data<ServerState>))
-    -> impl Future<Item = HttpResponse, Error = Error> { //Responder {
+    -> impl Future<Item = HttpResponse, Error = Error> {
     state.master_addr
         .send(RegisterWorker {})
         .from_err()

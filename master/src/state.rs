@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use shared::models::{ StartInfo, UpdateVersion, StateVersion };
 
@@ -40,7 +40,7 @@ impl State {
     }
 
     pub fn update(&mut self, update_file: String) {
-        self.version.0 += 1;
+        self.version.increment();
         self.update_version.0 += 1;
         self.update_file = Some(update_file);
 
@@ -49,7 +49,7 @@ impl State {
 
     fn set_action(&mut self, action: Action ) {
         if self.action != action {
-            self.version.0 += 1;
+            self.version.increment();
             self.action = action;
         }
     }

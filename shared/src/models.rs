@@ -8,6 +8,12 @@ pub struct UpdateVersion(pub u32);
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct StateVersion(pub u32);
 
+impl StateVersion {
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum WorkerAction {
     Start(StartInfo),

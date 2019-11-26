@@ -117,12 +117,12 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                             }
                         }
                     }
-                },
+                }
                 Some("s") => {
                     state.write().unwrap().stop();
 
                     println!("Stop scheduled");
-                },
+                }
                 _ => {
                     eprintln!("Invalid command: {}", &buf);
 

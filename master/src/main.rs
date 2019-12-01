@@ -31,10 +31,10 @@ fn main() -> io::Result<()> {
     print_help();
 
     let config = config::read(PATH_CONFIG)?;
-
     let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
 
     handle_input(data.clone(), config.data_path);
+
     server::run(data, config.addr)
 }
 

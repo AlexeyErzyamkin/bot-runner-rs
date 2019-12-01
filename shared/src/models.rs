@@ -84,6 +84,16 @@ pub struct RegisterResponse {
     pub id: String
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct StateRequest {
+    pub id: String
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StateResponse {
+
+}
+
 //#[derive(Serialize, Deserialize)]
 //pub struct ErrorResponse {
 //    pub error: String

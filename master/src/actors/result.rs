@@ -39,6 +39,4 @@ impl From<actix::MailboxError> for Error {
     }
 }
 
-// impl E
-
 pub type Result<T, E = Error> = result::Result<T, E>;

@@ -29,9 +29,9 @@ pub struct ServerState {
 }
 
 pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
-    let master_addr = MasterActor::create(|_ctx| {
-        MasterActor::new()
-    });
+    let sys = actix::System::new("bot-runner");
+
+    let master_addr = MasterActor::new().start();
 
     let handlers = move || {
         let state = ServerState {
@@ -44,6 +44,7 @@ pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
                 web::scope("/v2")
                     .data(state)
                     .route(URL_REGISTER, web::post().to_async(handlers::handle_register))
+                    .route(URL_STATE, web::post().to_async(handlers::handle_state_v2))
             )
             .service(
                 web::scope(URL_SCOPE)
@@ -51,8 +52,6 @@ pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
                     .route(URL_UPDATE, web::get().to(handlers::handle_update))
             )
     };
-
-    let sys = actix::System::new("bot-runner");
 
     let _server = HttpServer::new(handlers)
         .bind(addr)?

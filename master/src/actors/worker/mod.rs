@@ -1,6 +1,8 @@
+pub mod messages;
+
 use {
-    std::time::Instant,
-    actix::prelude::*
+    ::std::time::Instant,
+    ::actix::prelude::*
 };
 
 #[derive(Eq, PartialEq, Copy, Clone, Hash)]
@@ -24,20 +26,6 @@ impl WorkerActor {
 
 impl Actor for WorkerActor {
     type Context = Context<Self>;
-}
-
-pub struct StatusMessage {}
-
-impl Message for StatusMessage {
-    type Result = ();
-}
-
-impl Handler<StatusMessage> for WorkerActor {
-    type Result = ();
-
-    fn handle(&mut self, _msg: StatusMessage, _ctx: &mut Self::Context) -> Self::Result {
-        self.state.update();
-    }
 }
 
 struct WorkerState {

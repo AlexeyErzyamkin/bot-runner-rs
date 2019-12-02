@@ -1,5 +1,6 @@
 mod register_worker;
 mod get_worker_state;
+mod worker_dead;
 
 pub use {
     register_worker::{

@@ -28,7 +28,7 @@ impl Handler<GetWorkerState> for MasterActor {
 
     fn handle(&mut self, msg: GetWorkerState, _ctx: &mut Self::Context) -> Self::Result {
         let worker_uid = Uuid::parse_str(msg.worker_uid.as_str()).unwrap();
-        let worker = self.workers.get(&worker_uid).unwrap();
+        let worker = self.get_worker_addr_by_uid(&worker_uid).unwrap();
 
         let worker_message = worker.send(WorkerStatusMessage {})
             .from_err()

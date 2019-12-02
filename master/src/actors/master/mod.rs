@@ -15,16 +15,21 @@ use {
     }
 };
 
-pub enum ResultError {
-    Unknown
-}
+//pub enum ResultError {
+//    Unknown
+//}
 
 type WorkerAddr = Addr<WorkerActor>;
+
+pub struct WorkerInfo {
+    pub uid: Uuid,
+    pub addr: WorkerAddr
+}
 
 pub struct MasterActor {
     last_worker_id: WorkerId,
     worker_ids_by_uid: HashMap<Uuid, WorkerId>,
-    workers_by_id: HashMap<WorkerId, WorkerAddr>
+    workers_by_id: HashMap<WorkerId, WorkerInfo>
 }
 
 impl MasterActor {
@@ -40,13 +45,24 @@ impl MasterActor {
 
     pub(crate) fn get_worker_addr_by_uid(&self, uid: &Uuid) -> Option<&WorkerAddr> {
         match self.worker_ids_by_uid.get(uid) {
-            Some(wid) => self.workers_by_id.get(wid),
+            Some(wid) => self.get_worker_addr_by_id(wid),
             None => None
         }
     }
 
     pub(crate) fn get_worker_addr_by_id(&self, id: &WorkerId) -> Option<&WorkerAddr> {
-        self.workers_by_id.get(id)
+        match self.workers_by_id.get(id) {
+            Some(winfo) => Some(&winfo.addr),
+            None => None
+        }
+    }
+
+    pub(crate) fn add_worker(&mut self, uid: Uuid, id: WorkerId, addr: WorkerAddr) {
+        self.worker_ids_by_uid.insert(uid, id);
+        self.workers_by_id.insert(id, WorkerInfo {
+            uid,
+            addr
+        });
     }
 }
 

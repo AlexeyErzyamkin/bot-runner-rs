@@ -32,9 +32,9 @@ impl Handler<RegisterWorker> for MasterActor {
         let worker_uid_str = format!("{}", &worker_uid);
         let worker_id = next_id(&mut self.last_worker_id);
 
-        let addr = WorkerActor::new(worker_id.clone()).start();
+        let addr = WorkerActor::new(worker_id).start();
 
-        self.workers.insert(worker_uid, addr);
+        self.add_worker(worker_uid, worker_id, addr);
 
         Ok(RegisterWorkerResult { id: worker_uid_str })
     }

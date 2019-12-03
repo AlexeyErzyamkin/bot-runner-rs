@@ -10,5 +10,8 @@ pub use {
     get_worker_state::{
         GetWorkerState,
         GetWorkerStateResult
+    },
+    worker_dead::{
+        WorkerDead
     }
 };

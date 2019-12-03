@@ -10,7 +10,8 @@ use {
     crate::actors::{
         worker::{
             WorkerId,
-            WorkerActor
+            WorkerActor,
+            WorkerAddr
         },
     }
 };
@@ -19,7 +20,7 @@ use {
 //    Unknown
 //}
 
-type WorkerAddr = Addr<WorkerActor>;
+pub type MasterAddr = Addr<MasterActor>;
 
 pub struct WorkerInfo {
     pub uid: Uuid,

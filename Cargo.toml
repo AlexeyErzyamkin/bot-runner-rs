@@ -4,5 +4,6 @@ members = [
     "master",
     "worker",
     "client",
-    "shared"
+    "shared",
+    "async-worker"
 ]

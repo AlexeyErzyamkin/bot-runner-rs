@@ -52,6 +52,8 @@ impl WorkerActor {
                 id: self.state.id
             });
 
+            println!("Worker {:?}: Died", &self.state.id.0);
+
             ctx.stop();
         }
 
@@ -65,6 +67,8 @@ impl Actor for WorkerActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        println!("Worker {:?}: Started", &self.state.id.0);
+
         self.schedule_try_die(ctx);
     }
 }

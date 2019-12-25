@@ -5,6 +5,9 @@ use {
         HttpResponse,
         ResponseError
     },
+    ::tracing::{
+        span, Level, info
+    },
     shared,
     shared::models::{
         RegisterResponse
@@ -18,16 +21,30 @@ use {
     }
 };
 
-pub fn handle_register(state: web::Data<ServerState>)
-    -> impl Future<Item = HttpResponse, Error = Error>
+pub async fn handle_register(state: web::Data<ServerState>) -> Result<HttpResponse, Error>
+    // -> impl Future<Item = HttpResponse, Error = Error>
 {
-    state.master_addr
-        .send(RegisterWorker {})
-        .from_err()
-        .and_then(|res| match res {
-            Ok(res) => Ok(HttpResponse::Ok().json(RegisterResponse {
-                id: res.id
-            })),
-            Err(e) => Ok(e.error_response())
-        })
+    let t_span = span!(Level::TRACE, "/register");
+    let _t_enter = t_span.enter();
+
+    let res = state.master_addr.send(RegisterWorker {}).await?;
+
+    match res {
+        Ok(res) => Ok(HttpResponse::Ok().json(RegisterResponse {
+            key: res.key
+        })),
+        Err(e) => Ok(e.error_response())
+    }
+
+        // .from_err()
+        // .and_then(|res| {
+        //     info!("Registered worker");
+
+        //     match res {
+        //         Ok(res) => Ok(HttpResponse::Ok().json(RegisterResponse {
+        //             key: res.key
+        //         })),
+        //         Err(e) => Ok(e.error_response())
+        //     }
+        // })
 }

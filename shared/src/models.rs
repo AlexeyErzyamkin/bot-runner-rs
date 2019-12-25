@@ -59,20 +59,23 @@ impl Default for StartInfo {
     }
 }
 
-//#[derive(Serialize, Deserialize, Clone, Copy)]
-//pub struct WorkerId(pub u16);
-//
-//impl WorkerId {
-//    pub fn new() -> Self {
-//        Self(0)
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WorkerKey(pub String);
+
+// impl WorkerKey {
+//    pub fn new(value: String) -> Self {
+//        Self(S)
 //    }
-//
+
 //    pub fn to_next(&mut self) -> Self {
 //        self.0 += 1;
-//
+
 //        Self(self.0)
 //    }
-//}
+// }
+
+#[derive(Serialize, Deserialize)]
+pub struct EmptyResponse;
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterRequest {
@@ -81,18 +84,23 @@ pub struct RegisterRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterResponse {
-    pub id: String
+    pub key: WorkerKey
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct StateRequest {
-    pub id: String
+    pub key: WorkerKey
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct StateResponse {
 
 }
+
+// #[derive(Serialize, Deserialize)]
+// pub struct StartJobRequest {
+    
+// }
 
 //#[derive(Serialize, Deserialize)]
 //pub struct ErrorResponse {

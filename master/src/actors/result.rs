@@ -1,13 +1,14 @@
-use std::{
-    result,
-    fmt::{Display, Formatter, Error as FmtError}
+use {
+    ::std::{
+        result,
+        fmt::{Display, Formatter, Error as FmtError}
+    },
+    ::actix_web::{
+        HttpResponse,
+        ResponseError
+    },
+    ::actix::MailboxError
 };
-
-use actix_web::{
-    HttpResponse,
-    ResponseError
-};
-use actix::MailboxError;
 
 #[derive(Debug)]
 pub enum Error {

@@ -13,7 +13,7 @@ use shared::models::{
 };
 use crate::state::{State, Action};
 
-pub fn handle_state(_request: HttpRequest, state: web::Data<RwLock<State>>) -> impl Responder {
+pub async fn handle_state(_request: HttpRequest, state: web::Data<RwLock<State>>) -> impl Responder {
     // if let Some(remote_ip) = request.connection_info().remote() {
         
     // }

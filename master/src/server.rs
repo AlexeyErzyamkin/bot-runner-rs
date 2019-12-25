@@ -39,12 +39,12 @@ pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
         };
 
         App::new()
-            .register_data(data.clone())
+            .app_data(data.clone())
             .service(
                 web::scope("/v2")
                     .data(state)
-                    .route(URL_REGISTER, web::post().to_async(handlers::handle_register))
-                    .route(URL_STATE, web::post().to_async(handlers::handle_state_v2))
+                    .route(URL_REGISTER, web::post().to(handlers::handle_register))
+                    .route(URL_STATE, web::post().to(handlers::handle_state_v2))
             )
             .service(
                 web::scope(URL_SCOPE)

@@ -1,30 +1,37 @@
 mod process;
+mod update_status;
 
 use {
     std::{
-        io, fs,
         path::{
-            Path, PathBuf
-        },
-        time::Duration
+            Path
+        }
     },
     ::tokio::{
-        time,
+        fs,
         sync::mpsc::{
             self,
-            Sender, Receiver
+            Sender,
+            Receiver
         }
     },
     ::serde::Deserialize,
     ::surf::{
-        self, url::Url
+        url::Url
+    },
+    ::futures::{
+        try_join
     },
     shared::{
         URL_SCOPE, URL_STATE, URL_UPDATE,
         models::{
-            WorkerInfo, WorkerAction, UpdateVersion, StartInfo
+            UpdateVersion, StartInfo,
+            RegisterRequest, RegisterResponse,
+            WorkerKey
         }
-    }
+    },
+    process::process,
+    update_status::update_status
 };
 
 const PATH_DATA: &str = "data/unpacked";
@@ -43,9 +50,12 @@ pub enum WorkerCommand {
     Quit
 }
 
+type Tx = Sender<WorkerCommand>;
+type Rx = Receiver<WorkerCommand>;
+
 #[tokio::main]
-async fn main() -> io::Result<()> {
-    prepare_environment()?;
+async fn main() -> std::io::Result<()> {
+    prepare_environment().await?;
 
     let config_path = Path::new("./worker_config.json");
     let config: WorkerConfig = shared::read_config(config_path)?;
@@ -53,46 +63,38 @@ async fn main() -> io::Result<()> {
     let base_url = Url::parse(&config.addr).unwrap();
     let download_url = base_url.join(&format!("{}{}", URL_SCOPE, URL_UPDATE)).unwrap();
     let state_url = base_url.join(&format!("{}{}", URL_SCOPE, URL_STATE)).unwrap();
+    let register_url = base_url.join("v2/register").unwrap();
 
-    let (mut tx, mut rx): (Sender<WorkerCommand>, Receiver<WorkerCommand>) = mpsc::channel(100);
+    let (tx, rx) = mpsc::channel(10);
 
-    let mut prev_status = WorkerInfo::default();
+    let process_handle = tokio::spawn(async move {
+        process(rx, download_url).await
+    });
 
-    loop {
-        match surf::get(&state_url).recv_json::<WorkerInfo>().await {
-            Ok(status) => {
-                if status.version > prev_status.version {
-                    tx.send(WorkerCommand::Stop).await.unwrap();
+    let update_status_handle = tokio::spawn(async move {
+        update_status(tx, state_url).await
+    });
 
-                    if status.update_version > prev_status.update_version {
-                        tx.send(WorkerCommand::Update(status.update_version)).await.unwrap();
-                    }
+    match try_join!(process_handle, update_status_handle) {
+        Ok((a, b)) => a.and(b),
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
 
-                    match status.action {
-                        WorkerAction::Start(ref start_info) => {
-                            tx.send(WorkerCommand::Start(start_info.clone())).await.unwrap();
-                        },
-                        WorkerAction::Stop => (),
-                        WorkerAction::Update => ()
-                    };
-                }
-
-                prev_status = status;
-            }
-            Err(e) => {
-
-            }
+            Err(std::io::ErrorKind::Other.into())
         }
-
-        time::delay_for(Duration::from_secs(10)).await;
     }
-
-//    Ok(())
 }
 
-fn prepare_environment() -> io::Result<()> {
-    fs::create_dir_all(PATH_DATA)?;
-    fs::create_dir_all(PATH_DOWNLOAD)?;
+async fn prepare_environment() -> std::io::Result<()> {
+    fs::create_dir_all(PATH_DATA).await?;
+    fs::create_dir_all(PATH_DOWNLOAD).await?;
 
     Ok(())
+}
+
+async fn register(url: Url) -> Result<WorkerKey, String> {
+    match surf::post(&url).recv_json::<RegisterResponse>().await {
+        Ok(response) => Ok(response.key),
+        Err(_) => Err("".to_string())
+    }
 }

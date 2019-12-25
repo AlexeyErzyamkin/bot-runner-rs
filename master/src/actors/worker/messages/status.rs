@@ -12,12 +12,14 @@ pub struct StatusMessage {}
 
 pub struct StatusResponse {}
 
+pub type StatusMessageResult = Result<StatusResponse>;
+
 impl Message for StatusMessage {
-    type Result = Result<StatusResponse>;
+    type Result = StatusMessageResult;
 }
 
 impl Handler<StatusMessage> for WorkerActor {
-    type Result = <StatusMessage as Message>::Result;
+    type Result = StatusMessageResult;
 
     fn handle(&mut self, _msg: StatusMessage, _ctx: &mut Self::Context) -> Self::Result {
         self.state.update();

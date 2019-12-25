@@ -5,10 +5,12 @@ use {
         HttpResponse,
         ResponseError
     },
-    shared,
-    shared::models::{
-        StateRequest,
-        StateResponse
+    shared::{
+        self,
+        models::{
+            StateRequest,
+            StateResponse
+        }
     },
     crate::{
         actors::{
@@ -19,16 +21,15 @@ use {
     }
 };
 
-pub fn handle_state_v2((request, state): (web::Json<StateRequest>, web::Data<ServerState>))
-    -> impl Future<Item = HttpResponse, Error = Error>
+pub async fn handle_state_v2((request, state): (web::Json<StateRequest>, web::Data<ServerState>))
+    -> Result<HttpResponse, Error>
 {
-    state.master_addr
-        .send(GetWorkerState { worker_uid: request.id.clone() })
-        .from_err()
-        .and_then(|res| match res {
-            Ok(_res) => {
-                Ok(HttpResponse::Ok().json(StateResponse {}))
-            },
-            Err(e) => Ok(e.error_response())
-        })
+    let res = state.master_addr.send(GetWorkerState { worker_key: request.key.clone() }).await?;
+    
+    match res {
+        Ok(_res) => {
+            Ok(HttpResponse::Ok().json(StateResponse {}))
+        },
+        Err(e) => Ok(e.error_response())
+    }
 }

@@ -1,4 +1,8 @@
+pub mod error;
+
 use shared::models::{ StartInfo, UpdateVersion };
+
+pub use error::Error;
 
 pub enum WorkerCommand {
     Stop,
@@ -6,3 +10,5 @@ pub enum WorkerCommand {
     Update(UpdateVersion),
     Quit
 }
+
+pub type Result<T> = std::result::Result<T, Error>;

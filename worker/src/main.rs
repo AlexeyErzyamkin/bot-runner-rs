@@ -80,7 +80,7 @@ async fn prepare_environment() -> Result<()> {
 async fn update_status(
     client: &Client,
     stop_flag: Arc<AtomicBool>,
-    mut tx: Sender<WorkerCommand>,
+    tx: Sender<WorkerCommand>,
     addr: Url,
 ) -> Result<()> {
     let mut prev_status = WorkerInfo::default();
@@ -122,7 +122,7 @@ async fn update_status(
             }
         }
 
-        tokio::time::delay_for(time::Duration::from_secs(10)).await;
+        tokio::time::sleep(time::Duration::from_secs(10)).await;
     }
 
     Ok(())
@@ -202,7 +202,7 @@ async fn process(
                         Err(e) => {
                             eprintln!("Error download update: {:?}", e);
 
-                            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
                     }
                 },

@@ -1,4 +1,3 @@
-use std::io;
 use std::sync::RwLock;
 
 use actix_web::{
@@ -11,11 +10,12 @@ use shared::{ URL_SCOPE, URL_STATE, URL_UPDATE };
 
 use crate::state::State;
 use crate::handlers;
+use crate::Result;
 
-pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
+pub async fn run(data: web::Data<RwLock<State>>, addr: String) -> Result<()> {
     let handlers = move || {
         App::new()
-            .register_data(data.clone())
+            .data(data.clone())
             .service(
                 web::scope(URL_SCOPE)
                     .service(
@@ -27,7 +27,9 @@ pub fn run(data: web::Data<RwLock<State>>, addr: String) -> io::Result<()> {
             )
     };
 
-    HttpServer::new(handlers)
+    let srv = HttpServer::new(handlers)
         .bind(addr)?
-        .run()
+        .run();
+
+    srv.await.map_or_else(|e| Result::Err(e.into()), |r| Result::Ok(r))
 }

@@ -1,5 +1,4 @@
-use serde::export::Formatter;
-use std::fmt::{self, Display};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub enum Error {

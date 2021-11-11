@@ -1,4 +1,3 @@
-use std::fs;
 use std::io;
 use std::io::Write;
 use std::sync::RwLock;
@@ -9,9 +8,12 @@ use shared::archiving;
 
 use actix_web::web;
 
+use tokio::fs;
+
 use master::config;
 use master::server;
 use master::state::State;
+use master::Result;
 
 const PATH_UPDATES: &str = "data/updates";
 const PATH_CONFIG: &str = "./data/master_config.json";
@@ -26,8 +28,9 @@ fn print_help() {
     println!("      s - stop");
 }
 
-fn main() -> io::Result<()> {
-    prepare_environment()?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    prepare_environment().await?;
     print_help();
 
     let config = config::read(PATH_CONFIG)?;
@@ -35,11 +38,11 @@ fn main() -> io::Result<()> {
     let data = web::Data::new(RwLock::new(State::new(config.start_infos)));
 
     handle_input(data.clone(), config.data_path);
-    server::run(data, config.addr)
+    server::run(data, config.addr).await
 }
 
-fn prepare_environment() -> io::Result<()> {
-    fs::create_dir_all(PATH_UPDATES)?;
+async fn prepare_environment() -> Result<()> {
+    fs::create_dir_all(PATH_UPDATES).await?;
 
     Ok(())
 }

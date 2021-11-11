@@ -10,7 +10,7 @@ use zip::{
 };
 
 fn main() {
-    let mut arc_file = fs::File::create("../arc.zip").unwrap();
+    let arc_file = fs::File::create("../arc.zip").unwrap();
     let mut zip = ZipWriter::new(arc_file);
 
     let path = "data";
@@ -43,7 +43,7 @@ fn arc_dir<P: AsRef<Path> + Debug>(path: P, prefix: &str, options: FileOptions, 
 
             zip.start_file_from_path(path, options).unwrap();
             let mut from_file = fs::File::open(each_file_path).unwrap();
-            io::copy(&mut from_file, &mut zip);
+            io::copy(&mut from_file, &mut zip).unwrap();
         }
     }
 }

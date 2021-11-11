@@ -1,12 +1,29 @@
 use std::default::Default;
+use std::fmt::{Display, Formatter};
 
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
-pub struct UpdateVersion(pub u32);
+pub struct UpdateVersion(u32);
+
+impl UpdateVersion {
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+
+    pub fn next(&self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+impl Display for UpdateVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
-pub struct StateVersion(pub u32);
+pub struct StateVersion(u32);
 
 impl StateVersion {
     pub fn increment(&mut self) {

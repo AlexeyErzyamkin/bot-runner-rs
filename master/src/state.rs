@@ -41,7 +41,7 @@ impl State {
 
     pub fn update(&mut self, update_file: String) {
         self.version.increment();
-        self.update_version.0 += 1;
+        self.update_version.increment();
         self.update_file = Some(update_file);
 
         self.action = Action::Update;

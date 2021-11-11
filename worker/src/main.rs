@@ -216,9 +216,9 @@ async fn process(
 }
 
 async fn download_update(client: &Client, update_version: UpdateVersion, addr: Url) -> Result<()> {
-    println!("Downloading update {}... ", update_version.0);
+    println!("Downloading update {}... ", update_version);
 
-    let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version.0);
+    let file_name = format!("{}/{}.zip", PATH_DOWNLOAD, update_version);
 
     let response = client.get(addr).send().await?;
 

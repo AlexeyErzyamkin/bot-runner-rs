@@ -18,18 +18,14 @@ pub async fn run(data: web::Data<RwLock<State>>, addr: String) -> Result<()> {
             .data(data.clone())
             .service(
                 web::scope(URL_SCOPE)
-                    .service(
-                        web::resource(URL_STATE).to(handlers::handle_state)
-                    )
-                    .service(
-                        web::resource(URL_UPDATE).to(handlers::handle_update)
-                    )
+                    .service(web::resource(URL_STATE).to(handlers::handle_state))
+                    .service(web::resource(URL_UPDATE).to(handlers::handle_update))
             )
     };
 
-    let srv = HttpServer::new(handlers)
+    HttpServer::new(handlers)
         .bind(addr)?
-        .run();
-
-    srv.await.map_or_else(|e| Result::Err(e.into()), |r| Result::Ok(r))
+        .run()
+        .await
+        .or_else(|e| Result::Err(e.into()))
 }

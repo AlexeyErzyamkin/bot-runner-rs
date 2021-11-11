@@ -76,7 +76,7 @@ fn handle_input(state: web::Data<RwLock<State>>, data_path: String) {
                     let update_file = format!(
                         "{}/{}.zip",
                         PATH_UPDATES,
-                        state.read().unwrap().update_version.0 + 1
+                        state.read().unwrap().update_version.next()
                     );
 
                     println!("Archiving to '{}'... ", update_file);
